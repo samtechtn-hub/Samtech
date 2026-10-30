@@ -24,7 +24,9 @@ jobs:
           java-version: '17'
 
       - name: Installer Android SDK
-        uses: android-actions/setup-android@v3
+  uses: android-actions/setup-android@v3
+  with:
+    packages: 'platform-tools'
 
       - name: Installer les outils Android
         run: sdkmanager --install "build-tools;35.0.0"
