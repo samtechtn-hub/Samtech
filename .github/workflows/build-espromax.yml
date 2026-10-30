@@ -28,60 +28,11 @@ jobs:
   with:
     packages: 'platform-tools'
 
+     
       - name: Installer les outils Android
-        run: sdkmanager --install "build-tools;35.0.0"
-
-      - name: Télécharger APK
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.release_tag }}
-        run: |
-          mkdir -p input output
-          gh release download "$TAG" \
-            --pattern "ESPROMAX_V2_preparation_non_signee.apk" \
-            --dir input
-          test -s input/ESPROMAX_V2_preparation_non_signee.apk
-          unzip -tq input/ESPROMAX_V2_preparation_non_signee.apk
-
-      - name: Aligner et signer
+        shell: bash
         run: |
           set -euo pipefail
-          TOOLS="$ANDROID_HOME/build-tools/35.0.0"
-          "$TOOLS/zipalign" -f -p 4 \
-            input/ESPROMAX_V2_preparation_non_signee.apk \
-            output/aligned.apk
-
-          keytool -genkeypair -noprompt \
-            -keystore "$RUNNER_TEMP/test.jks" \
-            -alias espromax \
-            -storepass 'TemporaryTest123!' \
-            -keypass 'TemporaryTest123!' \
-            -keyalg RSA -keysize 3072 \
-            -validity 365 \
-            -dname "CN=ESPROMAX Test"
-
-          "$TOOLS/apksigner" sign \
-            --ks "$RUNNER_TEMP/test.jks" \
-            --ks-key-alias espromax \
-            --ks-pass pass:'TemporaryTest123!' \
-            --key-pass pass:'TemporaryTest123!' \
-            --v1-signing-enabled true \
-            --v2-signing-enabled true \
-            --v3-signing-enabled true \
-            --out output/ESPROMAX_V2_TEST.apk \
-            output/aligned.apk
-
-          "$TOOLS/apksigner" verify \
-            --verbose --print-certs \
-            output/ESPROMAX_V2_TEST.apk \
-            | tee output/verification.txt
-
-          rm output/aligned.apk
-
-      - name: Publier APK de test
-        uses: actions/upload-artifact@v4
-        with:
-          name: ESPROMAX-V2-TEST
-          path: output/
-          retention-days: 7
-          
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$SDKMANAGER" --install "build-tools;35.0.0"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" version
