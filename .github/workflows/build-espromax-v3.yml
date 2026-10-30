@@ -1,0 +1,85 @@
+
+name: ESPROMAX V3 NEO - Signer APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sign:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Installer Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Installer outils Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$SDKMANAGER" --install "build-tools;35.0.0"
+
+      - name: Telecharger ESPROMAX V3
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p input output
+          gh release download source-v3 \
+            --pattern "ESPROMAX_V3_NEO_preparation_non_signee.apk" \
+            --dir input
+          test -s input/ESPROMAX_V3_NEO_preparation_non_signee.apk
+          unzip -tq input/ESPROMAX_V3_NEO_preparation_non_signee.apk
+
+      - name: Aligner et signer APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+
+          "$TOOLS/zipalign" -f -p 4 \
+            input/ESPROMAX_V3_NEO_preparation_non_signee.apk \
+            output/aligned.apk
+
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/espromax-v3-test.jks" \
+            -alias espromaxv3 \
+            -storepass 'TemporaryTest123!' \
+            -keypass 'TemporaryTest123!' \
+            -keyalg RSA -keysize 3072 \
+            -validity 365 \
+            -dname "CN=ESPROMAX V3 NEO Test"
+
+          "$TOOLS/apksigner" sign \
+            --ks "$RUNNER_TEMP/espromax-v3-test.jks" \
+            --ks-key-alias espromaxv3 \
+            --ks-pass pass:'TemporaryTest123!' \
+            --key-pass pass:'TemporaryTest123!' \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out output/ESPROMAX_V3_NEO_TEST.apk \
+            output/aligned.apk
+
+          "$TOOLS/apksigner" verify \
+            --verbose --print-certs \
+            output/ESPROMAX_V3_NEO_TEST.apk \
+            | tee output/verification.txt
+
+          rm output/aligned.apk
+
+      - name: Publier APK signe
+        uses: actions/upload-artifact@v4
+        with:
+          name: ESPROMAX-V3-NEO-TEST
+          path: output/
+          retention-days: 7
+          
